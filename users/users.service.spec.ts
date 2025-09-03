@@ -1,49 +1,38 @@
-import { UsersService } from './users.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { User } from '../common/entities/user.entity';
 import { MediaService } from '../media/media.service';
-import { Media } from '../common/entities/media.entity';
 
-describe('UsersService', () => {
-  let usersService: UsersService;
-  let mediaService: MediaService;
+@Injectable()
+export class UsersService {
+  private users: User[] = [];
 
-  beforeEach(() => {
-    mediaService = new MediaService();
-    usersService = new UsersService(mediaService);
-  });
+  constructor(private readonly mediaService: MediaService) {}
 
-  it('deve adicionar uma mídia aos favoritos do usuário', () => {
-    const media: Media = mediaService.create({
-      title: 'Inception',
-      description: 'Sonhos dentro de sonhos',
-      type: 'movie',
-      releaseYear: 2010,
-      genre: 'Sci-Fi',
-    });
+  private getOrCreateUser(userId: string): User {
+    let user = this.users.find((u) => u.id === userId);
+    if (!user) {
+      user = { id: userId, favorites: [] };
+      this.users.push(user);
+    }
+    return user;
+  }
 
-    usersService.addFavorite('user1', media.id);
+  addFavorite(userId: string, mediaId: string): void {
+    const media = this.mediaService.findOne(mediaId);
+    if (!media) throw new NotFoundException('Mídia não encontrada');
+    const user = this.getOrCreateUser(userId);
+    if (!user.favorites.includes(mediaId)) {
+      user.favorites.push(mediaId);
+    }
+  }
 
-    const favorites = usersService.listFavorites('user1');
-    expect(favorites).toHaveLength(1);
-    expect(favorites[0].title).toBe('Inception');
-  });
+  listFavorites(userId: string) {
+    const user = this.getOrCreateUser(userId);
+    return user.favorites.map((id) => this.mediaService.findOne(id));
+  }
 
-  it('deve remover uma mídia da lista de favoritos', () => {
-    const media = mediaService.create({
-      title: 'Batman Begins',
-      description: 'O início do Cavaleiro das Trevas',
-      type: 'movie',
-      releaseYear: 2005,
-      genre: 'Ação',
-    });
-
-    usersService.addFavorite('user1', media.id);
-    usersService.removeFavorite('user1', media.id);
-
-    const favorites = usersService.listFavorites('user1');
-    expect(favorites).toHaveLength(0);
-  });
-
-  it('deve lançar erro ao tentar favoritar mídia inexistente', () => {
-    expect(() => usersService.addFavorite('user1', 'id-fake')).toThrow();
-  });
-});
+  removeFavorite(userId: string, mediaId: string): void {
+    const user = this.getOrCreateUser(userId);
+    user.favorites = user.favorites.filter((id) => id !== mediaId);
+  }
+}

@@ -4,7 +4,7 @@ import { UsersService } from './users.service';
 import { MediaModule } from '../media/media.module';
 
 @Module({
-  imports: [MediaModule], // importing MediaModule to use MediaService
+  imports: [MediaModule],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],
