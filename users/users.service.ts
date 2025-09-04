@@ -1,38 +1,43 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { User } from '../common/entities/user.entity';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User, UserDocument } from './schemas/user.schema';
 import { MediaService } from '../media/media.service';
 
 @Injectable()
 export class UsersService {
-  private users: User[] = [];
+  constructor(
+    private readonly mediaService: MediaService,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+  ) {}
 
-  constructor(private readonly mediaService: MediaService) {}
-
-  private getOrCreateUser(userId: string): User {
-    let user = this.users.find((u) => u.id === userId);
+  private async getOrCreateUser(userId: string): Promise<UserDocument> {
+    let user = await this.userModel.findOne({ id: userId }).exec();
     if (!user) {
-      user = { id: userId, favorites: [] };
-      this.users.push(user);
+      user = new this.userModel({ id: userId, favorites: [] });
+      await user.save();
     }
     return user;
   }
 
-  addFavorite(userId: string, mediaId: string): void {
-    const media = this.mediaService.findOne(mediaId);
-    if (!media) throw new NotFoundException('Mídia não encontrada');
-    const user = this.getOrCreateUser(userId);
+  async addFavorite(userId: string, mediaId: string): Promise<void> {
+    await this.mediaService.findOne(mediaId); // valida se existe
+    const user = await this.getOrCreateUser(userId);
+
     if (!user.favorites.includes(mediaId)) {
       user.favorites.push(mediaId);
+      await user.save();
     }
   }
 
-  listFavorites(userId: string) {
-    const user = this.getOrCreateUser(userId);
-    return user.favorites.map((id) => this.mediaService.findOne(id));
+  async listFavorites(userId: string) {
+    const user = await this.getOrCreateUser(userId);
+    return Promise.all(user.favorites.map((id) => this.mediaService.findOne(id)));
   }
 
-  removeFavorite(userId: string, mediaId: string): void {
-    const user = this.getOrCreateUser(userId);
+  async removeFavorite(userId: string, mediaId: string): Promise<void> {
+    const user = await this.getOrCreateUser(userId);
     user.favorites = user.favorites.filter((id) => id !== mediaId);
+    await user.save();
   }
 }

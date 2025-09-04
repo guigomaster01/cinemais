@@ -1,25 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Media, MediaDocument } from './schemas/media.schema';
 import { CreateMediaDto } from './dto/create-media.dto';
-import { Media } from '../common/entities/media.entity';
-import { randomUUID } from 'crypto';
 
 @Injectable()
 export class MediaService {
-  private media: Media[] = [];
+  constructor(
+    @InjectModel(Media.name) private mediaModel: Model<MediaDocument>,
+  ) {}
 
-  create(dto: CreateMediaDto): Media {
-    const newMedia: Media = { id: randomUUID(), ...dto };
-    this.media.push(newMedia);
-    return newMedia;
+  async create(dto: CreateMediaDto): Promise<Media> {
+    const newMedia = new this.mediaModel(dto);
+    return newMedia.save();
   }
 
-  findAll(): Media[] {
-    return this.media;
+  async findAll(): Promise<Media[]> {
+    return this.mediaModel.find().exec();
   }
 
-  findOne(id: string): Media {
-    const item = this.media.find((m) => m.id === id);
-    if (!item) throw new NotFoundException(`Mídia com id ${id} não encontrada`);
-    return item;
+  async findOne(id: string): Promise<Media> {
+    const media = await this.mediaModel.findById(id).exec();
+    if (!media) throw new NotFoundException(`Mídia com id ${id} não encontrada`);
+    return media;
   }
 }
